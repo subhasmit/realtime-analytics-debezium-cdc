@@ -53,9 +53,9 @@ services:
     environment:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker1:9092,PLAINTEXT://kafka-broker2:9094
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8082
     ports:
-      - "8081:8081"
+      - "8082:8082"
     volumes:
       - schema_registry_data:/var/lib/schema-registry
 
@@ -76,7 +76,7 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
 
@@ -99,10 +99,10 @@ services:
     container_name: hdfs-namenode
     environment:
       - CLUSTER_NAME=test-hadoop
-      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9001
     ports:
       - "9870:9870"
-      - "9000:9000"
+      - "9001:9000"
     volumes:
       - hdfs_namenode_data:/hadoop/dfs/name
 
@@ -110,7 +110,7 @@ services:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     container_name: hdfs-datanode
     environment:
-      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9001
     depends_on:
       - hdfs-namenode
     ports:
@@ -118,66 +118,124 @@ services:
     volumes:
       - hdfs_datanode_data:/hadoop/dfs/data
 
-  druid-coordinator:
-    image: apache/druid:31.0.1-rc2
-    container_name: druid-coordinator
-    environment:
-      DRUID_XMX: 4g
-      DRUID_XMS: 4g
-      DRUID_STORAGE_TYPE: hdfs
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_HOST: postgres-druid
-      DRUID_METADATA_STORAGE_PORT: 5432
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_USER: druid
-      DRUID_METADATA_STORAGE_PASSWORD: druid
-    depends_on:
-      - postgres-druid
-      - hdfs-namenode
+  flink-jobmanager:
+    image: flink:1.15.2
+    container_name: flink-jobmanager
+    command: jobmanager
     ports:
-      - "8282:8082"
-
-  druid-middlemanager:
-    image: apache/druid:31.0.1-rc2
-    container_name: druid-middlemanager
+      - "8083:8081"
     environment:
-      DRUID_XMX: 8g
-      DRUID_XMS: 8g
-      DRUID_STORAGE_TYPE: hdfs
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
-      DRUID_SEGMENT_WRITER_TYPE: parquet
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
     depends_on:
-      - druid-coordinator
-      - hdfs-namenode
-    ports:
-      - "8292:8092"
+      - kafka-broker1
+      - kafka-broker2
+    volumes:
+      - flink_data:/opt/flink/data
 
-  druid-historical:
-    image: apache/druid:31.0.1-rc2
-    container_name: druid-historical
+  flink-taskmanager:
+    image: flink:1.15.2
+    container_name: flink-taskmanager
+    command: taskmanager
     environment:
-      DRUID_XMX: 8g
-      DRUID_XMS: 8g
-      DRUID_STORAGE_TYPE: hdfs
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
+      - TASK_MANAGER_RPC_ADDRESS=flink-taskmanager
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
     depends_on:
-      - druid-coordinator
-      - hdfs-namenode
+      - flink-jobmanager
     ports:
-      - "8291:8091"
+      - "8084:8081"
+    volumes:
+      - flink_data:/opt/flink/data
 
-  postgres-druid:
+  spark-master:
+    image: bitnami/spark:latest
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "7078:7077"
+      - "8085:8080"
+
+  spark-worker:
+    image: bitnami/spark:latest
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7078
+    depends_on:
+      - spark-master
+    ports:
+      - "8086:8081"
+
+  debezium-connect:
+    image: debezium/connect:latest
+    container_name: debezium-connect
+    depends_on:
+      - kafka-broker1
+      - kafka-broker2
+    environment:
+      - BOOTSTRAP_SERVERS=kafka-broker1:9092,kafka-broker2:9094
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=debezium-config
+      - OFFSET_STORAGE_TOPIC=debezium-offsets
+      - STATUS_STORAGE_TOPIC=debezium-status
+      - CONNECT_PLUGIN_PATH=/kafka/connect
+    volumes:
+      - ./connect-plugins:/kafka/connect
+    ports:
+      - "8087:8083"
+
+  postgres-source:
     image: postgres:latest
-    container_name: postgres-druid
+    container_name: postgres-source
     environment:
-      POSTGRES_USER: druid
-      POSTGRES_PASSWORD: druid
-      POSTGRES_DB: druid
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sourcedb
     ports:
       - "5433:5432"
     volumes:
-      - postgres_druid_data:/var/lib/postgresql/data
+      - postgres_source_data:/var/lib/postgresql/data
+
+  mysql-source:
+    image: mysql:latest
+    container_name: mysql-source
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sourcedb
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_source_data:/var/lib/mysql
+
+  oracle-source:
+    image: gvenzl/oracle-xe:latest
+    container_name: oracle-source
+    environment:
+      ORACLE_PASSWORD: oracle
+      APP_USER: appuser
+      APP_USER_PASSWORD: appuser
+    ports:
+      - "1522:1521"
+      - "5501:5500"
+    volumes:
+      - oracle_source_data:/opt/oracle
+
+  sqlserver-source:
+    image: mcr.microsoft.com/mssql/server:latest
+    container_name: sqlserver-source
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourStrongPassword1"
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver_source_data:/var/opt/mssql
+
+  powerbi:
+    image: powerbi-report-server:latest
+    container_name: powerbi
+    ports:
+      - "8088:80"
 
 volumes:
   kafka_data_broker1:
@@ -229,9 +287,44 @@ volumes:
       o: "bind"
       device: "F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/postgres-druid"
 
+  postgres_source_data:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/postgres-source"
+
+  mysql_source_data:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/mysql-source"
+
+  sqlserver_source_data:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/sqlserver-source"
+
+  oracle_source_data:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/oracle-source"
+
   grafana_data:
     driver: local
     driver_opts:
       type: "none"
       o: "bind"
       device: "F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/grafana"
+
+  flink_data:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/flink"
