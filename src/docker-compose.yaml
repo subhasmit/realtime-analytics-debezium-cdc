@@ -1,0 +1,175 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper
+
+  kafka-broker1:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-broker1
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker1:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data_broker1:/var/lib/kafka
+
+  kafka-broker2:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-broker2
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker2:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+    ports:
+      - "9093:9093"
+    volumes:
+      - kafka_data_broker2:/var/lib/kafka
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+
+  hdfs-namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: hdfs-namenode
+    environment:
+      - CLUSTER_NAME=test-hadoop
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    volumes:
+      - hdfs_namenode_data:/hadoop/dfs/name
+
+  hdfs-datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: hdfs-datanode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+    depends_on:
+      - hdfs-namenode
+    ports:
+      - "9864:9864"
+    volumes:
+      - hdfs_datanode_data:/hadoop/dfs/data
+
+  druid-coordinator:
+    image: apache/druid:latest
+    container_name: druid-coordinator
+    environment:
+      DRUID_XMX: 4g
+      DRUID_XMS: 4g
+      DRUID_STORAGE_TYPE: hdfs
+      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
+      DRUID_METADATA_STORAGE_TYPE: postgresql
+      DRUID_METADATA_STORAGE_HOST: postgres-druid
+      DRUID_METADATA_STORAGE_PORT: 5432
+      DRUID_METADATA_STORAGE_DB: druid
+      DRUID_METADATA_STORAGE_USER: druid
+      DRUID_METADATA_STORAGE_PASSWORD: druid
+    depends_on:
+      - postgres-druid
+      - hdfs-namenode
+    ports:
+      - "8082:8082"
+
+  druid-middlemanager:
+    image: apache/druid:latest
+    container_name: druid-middlemanager
+    environment:
+      DRUID_XMX: 8g
+      DRUID_XMS: 8g
+      DRUID_STORAGE_TYPE: hdfs
+      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
+      DRUID_SEGMENT_WRITER_TYPE: parquet
+    depends_on:
+      - druid-coordinator
+      - hdfs-namenode
+    ports:
+      - "8092:8092"
+
+  druid-historical:
+    image: apache/druid:latest
+    container_name: druid-historical
+    environment:
+      DRUID_XMX: 8g
+      DRUID_XMS: 8g
+      DRUID_STORAGE_TYPE: hdfs
+      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
+    depends_on:
+      - druid-coordinator
+      - hdfs-namenode
+    ports:
+      - "8091:8091"
+
+  postgres-druid:
+    image: postgres:latest
+    container_name: postgres-druid
+    environment:
+      POSTGRES_USER: druid
+      POSTGRES_PASSWORD: druid
+      POSTGRES_DB: druid
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_druid_data:/var/lib/postgresql/data
+
+volumes:
+  kafka_data_broker1:
+  kafka_data_broker2:
+  zookeeper_data:
+  schema_registry_data:
+  hdfs_namenode_data:
+  hdfs_datanode_data:
+  postgres_druid_data:
+  grafana_data:

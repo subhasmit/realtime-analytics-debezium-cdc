@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+rule_files:
+  - "/etc/prometheus/alert.rules"
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
+
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-broker1:9092', 'kafka-broker2:9093']
+
+  - job_name: 'zookeeper'
+    static_configs:
+      - targets: ['zookeeper:2181']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
