@@ -167,7 +167,7 @@ services:
       - "8086:8081"
 
   debezium-connect:
-    image: debezium/connect:latest
+    image: debezium/connect:2.7.3.Final
     container_name: debezium-connect
     depends_on:
       - kafka-broker1

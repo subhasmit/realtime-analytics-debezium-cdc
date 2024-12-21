@@ -1,113 +1,125 @@
-# realtime-analytics-debezium-cdc
-Real-Time Analytics with Stream Processing and Change Data Capture: A Kafka-Based Solution for Data Warehousing
+### **Steps to Deploy and Start Ingesting Data**
 
-### **Steps to Deploy the Updated System**
-1. **Prepare Your Local Environment**:
-   - Ensure **Docker Desktop** is installed and running on your Windows machine.
-   - Verify Docker and Docker Compose are properly installed:
+#### **1. Prepare Your Environment**
+1. **Install Docker and Docker Compose**:
+   - Ensure Docker and Docker Compose are installed on your system. Use the following commands to verify:
      ```bash
      docker --version
      docker-compose --version
      ```
 
-2. **Set Up the Deployment Directory**:
-   - Create a directory for the deployment, e.g., `C:\docker-deployment\monitoring-system`.
-   - Place the following files in this directory:
-     - `docker-compose.yml`: The updated file you just created.
-     - `prometheus.yml`: Configuration for Prometheus.
-     - `alertmanager.yml`: Configuration for Alertmanager.
+2. **Set Up External Storage**:
+   - Confirm that the external storage path is accessible and mounted correctly (e.g., `F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data`).
 
-3. **Ensure External Storage Access**:
-   - Verify that your external storage drive (e.g., `E:/docker-data`) is set up as Docker shared storage.
-   - In Docker Desktop, go to **Settings > Resources > File Sharing** and ensure the external storage drive is shared.
+3. **Configure the Docker Compose File**:
+   - Ensure the `docker-compose.yml` file is updated with your specific environment variables, database credentials, and volume paths.
 
-4. **Start the System**:
-   - Open **Command Prompt** or **PowerShell**, navigate to the deployment directory, and run:
-     ```bash
-     docker-compose up -d
-     ```
-   - This command will:
-     - Build and start all the containers defined in `docker-compose.yml`.
-     - Run them in the background.
+---
 
-5. **Verify Services**:
-   - Check that all containers are running:
+#### **2. Deploy the Docker Compose Services**
+1. **Navigate to the Deployment Directory**:
+   ```bash
+   cd /path/to/your/docker-compose-directory
+   ```
+
+2. **Start All Services**:
+   ```bash
+   docker-compose up -d
+   ```
+   - This command starts all containers in detached mode.
+
+3. **Verify the Deployment**:
+   - List running containers:
      ```bash
      docker ps
      ```
+   - Ensure all services (Kafka, Zookeeper, HDFS, databases, connectors, etc.) are running.
 
-6. **Access Logs (Optional)**:
-   - View logs for any container (e.g., Prometheus):
+---
+
+#### **3. Configure Debezium Connectors**
+1. **Access the Kafka Connect REST API**:
+   - Kafka Connect runs at `http://localhost:8087`.
+
+2. **Create Connector Configurations for Each Database**:
+   - Example JSON payload for a PostgreSQL Debezium connector:
+     ```json
+     {
+       "name": "postgres-connector",
+       "config": {
+         "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+         "tasks.max": "1",
+         "database.hostname": "postgres-source",
+         "database.port": "5433",
+         "database.user": "postgres",
+         "database.password": "postgres",
+         "database.dbname": "sourcedb",
+         "database.server.name": "postgresql",
+         "table.include.list": "public.my_table",
+         "plugin.name": "pgoutput",
+         "database.history.kafka.bootstrap.servers": "kafka-broker1:9092",
+         "database.history.kafka.topic": "schema-changes.postgresql"
+       }
+     }
+     ```
+   - Post the configuration to Kafka Connect:
      ```bash
-     docker logs prometheus
+     curl -X POST -H "Content-Type: application/json" --data @postgres-connector.json http://localhost:8087/connectors
      ```
 
+3. **Repeat for Other Data Sources**:
+   - Replace the relevant configurations for MySQL, Oracle, and SQL Server.
+
 ---
 
-### **URLs to Monitor**
-1. **Prometheus**:
+#### **4. Verify Data Ingestion**
+1. **Check Kafka Topics**:
+   - Use the Kafka CLI tools or a UI like Confluent Control Center to ensure data is flowing into Kafka topics.
+
+2. **Access Flink and Spark**:
+   - Flink UI: [http://localhost:8083](http://localhost:8083)
+   - Spark UI: [http://localhost:8085](http://localhost:8085)
+
+3. **Load Data into Persistent Storage**:
+   - Ensure HDFS is set up as a sink for processed data and Druid is consuming the data from Kafka or HDFS.
+
+---
+
+#### **5. Set Up Monitoring**
+1. **Access Grafana**:
+   - URL: [http://localhost:3001](http://localhost:3001)
+   - Default credentials: `admin`/`admin`.
+
+2. **Access Prometheus**:
    - URL: [http://localhost:9090](http://localhost:9090)
-   - Use Prometheus to monitor system metrics and query data.
 
-2. **Grafana**:
-   - URL: [http://localhost:3000](http://localhost:3000)
-   - Default login credentials:
-     - Username: `admin`
-     - Password: `admin`
-   - Configure Prometheus as a data source in Grafana:
-     1. Log in to Grafana.
-     2. Go to **Configuration > Data Sources**.
-     3. Add a new data source of type **Prometheus** with URL `http://prometheus:9090`.
-
-3. **Alertmanager**:
-   - URL: [http://localhost:9093](http://localhost:9093)
-   - Use Alertmanager to manage and send alerts via email or other notification channels.
-
-4. **Schema Registry**:
-   - URL: [http://localhost:8081](http://localhost:8081)
-   - Use the Schema Registry REST API to manage schemas.
-
-5. **Node Exporter**:
-   - URL: [http://localhost:9100/metrics](http://localhost:9100/metrics)
-   - Provides metrics about the host system.
-
-6. **Druid Coordinator Console**:
-   - URL: [http://localhost:8082](http://localhost:8082)
-   - Manage Druid services and data ingestion tasks.
-
-7. **HDFS NameNode UI**:
-   - URL: [http://localhost:9870](http://localhost:9870)
-   - Monitor HDFS storage and block distribution.
+3. **Configure Alerts**:
+   - Update the Alertmanager configuration (`alertmanager.yml`) to send email notifications or other alerts.
 
 ---
 
-### **Reference URLs**
-1. **Prometheus Documentation**:
+### **Reference URLs for Resources**
+1. **Debezium Documentation**:
+   - [https://debezium.io/documentation/](https://debezium.io/documentation/)
+
+2. **Kafka Connect API**:
+   - [https://docs.confluent.io/platform/current/connect/index.html](https://docs.confluent.io/platform/current/connect/index.html)
+
+3. **Apache Flink Documentation**:
+   - [https://nightlies.apache.org/flink/](https://nightlies.apache.org/flink/)
+
+4. **Apache Spark Documentation**:
+   - [https://spark.apache.org/docs/latest/](https://spark.apache.org/docs/latest/)
+
+5. **Prometheus Documentation**:
    - [https://prometheus.io/docs/](https://prometheus.io/docs/)
 
-2. **Grafana Documentation**:
+6. **Grafana Documentation**:
    - [https://grafana.com/docs/](https://grafana.com/docs/)
 
-3. **Alertmanager Documentation**:
-   - [https://prometheus.io/docs/alerting/latest/alertmanager/](https://prometheus.io/docs/alerting/latest/alertmanager/)
-
-4. **Schema Registry API Reference**:
-   - [https://docs.confluent.io/platform/current/schema-registry/develop/api.html](https://docs.confluent.io/platform/current/schema-registry/develop/api.html)
-
-5. **Druid Documentation**:
+7. **Apache Druid Documentation**:
    - [https://druid.apache.org/docs/latest/](https://druid.apache.org/docs/latest/)
-
-6. **HDFS Monitoring**:
-   - [https://hadoop.apache.org/docs/r3.3.0/hadoop-project-dist/hadoop-hdfs/HDFSUserGuide.html](https://hadoop.apache.org/docs/r3.3.0/hadoop-project-dist/hadoop-hdfs/HDFSUserGuide.html)
 
 ---
 
-### **Next Steps**
-- **Set Up Alerts**:
-  - Configure Prometheus rules to trigger alerts, and verify email notifications are sent via Alertmanager.
-
-- **Test the Workflow**:
-  - Ingest data into Kafka topics, process it via Druid, and monitor the entire pipeline using Grafana.
-
-- **Monitor Resource Usage**:
-  - Use `docker stats` or Node Exporter metrics to track CPU, memory, and disk usage.
+These steps will help you deploy the system, start ingesting data, and monitor the pipeline. Let me know if you encounter any issues!
