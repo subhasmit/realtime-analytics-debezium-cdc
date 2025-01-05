@@ -55,21 +55,41 @@ services:
         bind:
           create_host_path: true
   druid-broker:
+    command:
+      - broker
     container_name: druid-broker
     depends_on:
       druid-coordinator:
         condition: service_started
         required: true
+      druid-metadata-db:
+        condition: service_started
+        required: true
+      zookeeper:
+        condition: service_started
+        required: true
     environment:
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_METADATA_STORAGE_PORT: "5434"
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_USER: druid_user
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+      DRUID_SINGLE_NODE_CONF: micro-quickstart
       DRUID_XMS: 4g
       DRUID_XMX: 4g
-    image: apache/druid:27.0.0
+      druid_emitter_logging_logLevel: debug
+      druid_extensions_loadList: '["druid-histogram", "druid-datasketches", "druid-lookups-cached-global", "postgresql-metadata-storage", "druid-multi-stage-query"]'
+      druid_indexer_fork_property_druid_processing_buffer_sizeBytes: 256MiB
+      druid_indexer_logs_directory: /opt/shared/indexing-logs
+      druid_indexer_logs_type: file
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=3g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_password: FoolishPassword
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_host: ""
+      druid_metadata_storage_type: postgresql
+      druid_processing_numMergeBuffers: "2"
+      druid_processing_numThreads: "2"
+      druid_storage_storageDirectory: /opt/shared/segments
+      druid_storage_type: local
+      druid_zk_service_host: zookeeper
+    image: apache/druid:31.0.0
     logging:
       options:
         max-file: "3"
@@ -81,25 +101,44 @@ services:
         target: 8092
         published: "8092"
         protocol: tcp
+    volumes:
+      - type: volume
+        source: broker_var
+        target: /opt/druid/var
+        volume: {}
   druid-coordinator:
+    command:
+      - coordinator
     container_name: druid-coordinator
     depends_on:
-      hdfs-namenode:
+      druid-metadata-db:
+        condition: service_started
+        required: true
+      zookeeper:
         condition: service_started
         required: true
     environment:
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_METADATA_STORAGE_PORT: "5434"
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_SEGMENT_WRITER_TYPE: parquet
-      DRUID_STORAGE_TYPE: hdfs
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+      DRUID_SINGLE_NODE_CONF: micro-quickstart
       DRUID_XMS: 4g
       DRUID_XMX: 4g
-    image: apache/druid:27.0.0
+      druid_emitter_logging_logLevel: debug
+      druid_extensions_loadList: '["druid-histogram", "druid-datasketches", "druid-lookups-cached-global", "postgresql-metadata-storage", "druid-multi-stage-query"]'
+      druid_indexer_fork_property_druid_processing_buffer_sizeBytes: 256MiB
+      druid_indexer_logs_directory: /opt/shared/indexing-logs
+      druid_indexer_logs_type: file
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=3g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_password: FoolishPassword
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_host: ""
+      druid_metadata_storage_type: postgresql
+      druid_processing_numMergeBuffers: "2"
+      druid_processing_numThreads: "2"
+      druid_storage_storageDirectory: /opt/shared/segments
+      druid_storage_type: local
+      druid_zk_service_host: zookeeper
+    image: apache/druid:31.0.0
     logging:
       options:
         max-file: "3"
@@ -112,30 +151,50 @@ services:
         published: "8082"
         protocol: tcp
     volumes:
-      - type: bind
-        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\druid-config
-        target: /opt/druid/conf
-        bind:
-          create_host_path: true
+      - type: volume
+        source: druid_shared
+        target: /opt/shared
+        volume: {}
+      - type: volume
+        source: coordinator_var
+        target: /opt/druid/var
+        volume: {}
   druid-historical:
+    command:
+      - historical
     container_name: druid-historical
     depends_on:
       druid-coordinator:
         condition: service_started
         required: true
+      druid-metadata-db:
+        condition: service_started
+        required: true
+      zookeeper:
+        condition: service_started
+        required: true
     environment:
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_METADATA_STORAGE_PORT: "5434"
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_SEGMENT_WRITER_TYPE: parquet
-      DRUID_STORAGE_TYPE: hdfs
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+      DRUID_SINGLE_NODE_CONF: micro-quickstart
       DRUID_XMS: 4g
       DRUID_XMX: 4g
-    image: apache/druid:27.0.0
+      druid_emitter_logging_logLevel: debug
+      druid_extensions_loadList: '["druid-histogram", "druid-datasketches", "druid-lookups-cached-global", "postgresql-metadata-storage", "druid-multi-stage-query"]'
+      druid_indexer_fork_property_druid_processing_buffer_sizeBytes: 256MiB
+      druid_indexer_logs_directory: /opt/shared/indexing-logs
+      druid_indexer_logs_type: file
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=3g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_password: FoolishPassword
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_host: ""
+      druid_metadata_storage_type: postgresql
+      druid_processing_numMergeBuffers: "2"
+      druid_processing_numThreads: "2"
+      druid_storage_storageDirectory: /opt/shared/segments
+      druid_storage_type: local
+      druid_zk_service_host: zookeeper
+    image: apache/druid:31.0.0
     logging:
       options:
         max-file: "3"
@@ -147,6 +206,15 @@ services:
         target: 8091
         published: "8091"
         protocol: tcp
+    volumes:
+      - type: volume
+        source: druid_shared
+        target: /opt/shared
+        volume: {}
+      - type: volume
+        source: historical_var
+        target: /opt/druid/var
+        volume: {}
   druid-metadata-db:
     container_name: druid-metadata-db
     environment:
@@ -171,23 +239,41 @@ services:
         target: /var/lib/postgresql/data
         volume: {}
   druid-middlemanager:
+    command:
+      - middleManager
     container_name: druid-middlemanager
     depends_on:
       druid-coordinator:
         condition: service_started
         required: true
+      druid-metadata-db:
+        condition: service_started
+        required: true
+      zookeeper:
+        condition: service_started
+        required: true
     environment:
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_METADATA_STORAGE_PORT: "5434"
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_STORAGE_TYPE: hdfs
-      DRUID_XMS: 2g
-      DRUID_XMX: 2g
-    image: apache/druid:27.0.0
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+      DRUID_SINGLE_NODE_CONF: micro-quickstart
+      DRUID_XMS: 4g
+      DRUID_XMX: 4g
+      druid_emitter_logging_logLevel: debug
+      druid_extensions_loadList: '["druid-histogram", "druid-datasketches", "druid-lookups-cached-global", "postgresql-metadata-storage", "druid-multi-stage-query"]'
+      druid_indexer_fork_property_druid_processing_buffer_sizeBytes: 256MiB
+      druid_indexer_logs_directory: /opt/shared/indexing-logs
+      druid_indexer_logs_type: file
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=3g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_password: FoolishPassword
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_host: ""
+      druid_metadata_storage_type: postgresql
+      druid_processing_numMergeBuffers: "2"
+      druid_processing_numThreads: "2"
+      druid_storage_storageDirectory: /opt/shared/segments
+      druid_storage_type: local
+      druid_zk_service_host: zookeeper
+    image: apache/druid:31.0.0
     logging:
       options:
         max-file: "3"
@@ -199,22 +285,75 @@ services:
         target: 8093
         published: "8093"
         protocol: tcp
-  druid-overlord:
-    container_name: druid-overlord
+      - mode: ingress
+        target: 8100
+        published: "8100"
+        protocol: tcp
+      - mode: ingress
+        target: 8101
+        published: "8101"
+        protocol: tcp
+      - mode: ingress
+        target: 8102
+        published: "8102"
+        protocol: tcp
+      - mode: ingress
+        target: 8103
+        published: "8103"
+        protocol: tcp
+      - mode: ingress
+        target: 8104
+        published: "8104"
+        protocol: tcp
+      - mode: ingress
+        target: 8105
+        published: "8105"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: druid_shared
+        target: /opt/shared
+        volume: {}
+      - type: volume
+        source: middle_var
+        target: /opt/druid/var
+        volume: {}
+  druid-router:
+    command:
+      - router
+    container_name: druid-router
     depends_on:
       druid-coordinator:
         condition: service_started
         required: true
+      druid-metadata-db:
+        condition: service_started
+        required: true
+      zookeeper:
+        condition: service_started
+        required: true
     environment:
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_METADATA_STORAGE_PORT: "5434"
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_XMS: 2g
-      DRUID_XMX: 2g
-    image: apache/druid:27.0.0
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+      DRUID_SINGLE_NODE_CONF: micro-quickstart
+      DRUID_XMS: 4g
+      DRUID_XMX: 4g
+      druid_emitter_logging_logLevel: debug
+      druid_extensions_loadList: '["druid-histogram", "druid-datasketches", "druid-lookups-cached-global", "postgresql-metadata-storage", "druid-multi-stage-query"]'
+      druid_indexer_fork_property_druid_processing_buffer_sizeBytes: 256MiB
+      druid_indexer_logs_directory: /opt/shared/indexing-logs
+      druid_indexer_logs_type: file
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=3g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_password: FoolishPassword
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_host: ""
+      druid_metadata_storage_type: postgresql
+      druid_processing_numMergeBuffers: "2"
+      druid_processing_numThreads: "2"
+      druid_storage_storageDirectory: /opt/shared/segments
+      druid_storage_type: local
+      druid_zk_service_host: zookeeper
+    image: apache/druid:31.0.0
     logging:
       options:
         max-file: "3"
@@ -223,9 +362,14 @@ services:
       default: null
     ports:
       - mode: ingress
-        target: 8090
-        published: "8090"
+        target: 8888
+        published: "8888"
         protocol: tcp
+    volumes:
+      - type: volume
+        source: router_var
+        target: /opt/druid/var
+        volume: {}
   dynamodb-source:
     container_name: dynamodb-source
     image: amazon/dynamodb-local
@@ -806,6 +950,10 @@ networks:
   default:
     name: docker_default
 volumes:
+  broker_var:
+    name: docker_broker_var
+  coordinator_var:
+    name: docker_coordinator_var
   druid_metadata_data:
     name: docker_druid_metadata_data
     driver: local
@@ -813,6 +961,8 @@ volumes:
       device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/druid-metadata
       o: bind
       type: none
+  druid_shared:
+    name: docker_druid_shared
   dynamodb_source_data:
     name: docker_dynamodb_source_data
     driver: local
@@ -848,6 +998,8 @@ volumes:
       device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/hdfs-namenode
       o: bind
       type: none
+  historical_var:
+    name: docker_historical_var
   kafka_data_broker1:
     name: docker_kafka_data_broker1
     driver: local
@@ -862,6 +1014,8 @@ volumes:
       device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/kafka-broker2
       o: bind
       type: none
+  middle_var:
+    name: docker_middle_var
   mysql_source_data:
     name: docker_mysql_source_data
     driver: local
@@ -904,6 +1058,8 @@ volumes:
       device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/redis
       o: bind
       type: none
+  router_var:
+    name: docker_router_var
   schema_registry_data:
     name: docker_schema_registry_data
     driver: local

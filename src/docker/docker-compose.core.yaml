@@ -137,115 +137,103 @@ services:
         max-file: "3"
 
   druid-coordinator:
-    image: apache/druid:27.0.0
+    image: apache/druid:31.0.0
     container_name: druid-coordinator
-    environment:
-      DRUID_XMX: 4g
-      DRUID_XMS: 4g
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PORT: 5434
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_STORAGE_TYPE: hdfs
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
-      DRUID_SEGMENT_WRITER_TYPE: parquet
+    volumes:
+      - druid_shared:/opt/shared
+      - coordinator_var:/opt/druid/var
     depends_on:
-      - hdfs-namenode
+      - zookeeper
+      - druid-metadata-db
     ports:
       - "8082:8082"
-    volumes:
-      - ../druid-config:/opt/druid/conf
+    command:
+      - coordinator
     logging:
       options:
         max-size: "10m"
         max-file: "3"
+    env_file:
+      - druid-environment
 
-  druid-overlord:
-    image: apache/druid:27.0.0
-    container_name: druid-overlord
-    environment:
-      DRUID_XMX: 2g
-      DRUID_XMS: 2g
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PORT: 5434
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
+  druid-broker:
+    image: apache/druid:31.0.0
+    container_name: druid-broker
+    volumes:
+      - broker_var:/opt/druid/var
     depends_on:
+      - zookeeper
+      - druid-metadata-db
       - druid-coordinator
     ports:
-      - "8090:8090"
+      - "8092:8092"
+    command:
+      - broker
+    env_file:
+      - druid-environment
     logging:
       options:
         max-size: "10m"
         max-file: "3"
 
   druid-historical:
-    image: apache/druid:27.0.0
+    image: apache/druid:31.0.0
     container_name: druid-historical
-    environment:
-      DRUID_XMX: 4g
-      DRUID_XMS: 4g
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PORT: 5434
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_STORAGE_TYPE: hdfs
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
-      DRUID_SEGMENT_WRITER_TYPE: parquet
-    depends_on:
+    volumes:
+      - druid_shared:/opt/shared
+      - historical_var:/opt/druid/var
+    depends_on: 
+      - zookeeper
+      - druid-metadata-db
       - druid-coordinator
     ports:
       - "8091:8091"
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  druid-broker:
-    image: apache/druid:27.0.0
-    container_name: druid-broker
-    environment:
-      DRUID_XMX: 4g
-      DRUID_XMS: 4g
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PORT: 5434
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-    depends_on:
-      - druid-coordinator
-    ports:
-      - "8092:8092"
+    command:
+      - historical
+    env_file:
+      - druid-environment
     logging:
       options:
         max-size: "10m"
         max-file: "3"
 
   druid-middlemanager:
-    image: apache/druid:27.0.0
+    image: apache/druid:31.0.0
     container_name: druid-middlemanager
-    environment:
-      DRUID_XMX: 2g
-      DRUID_XMS: 2g
-      DRUID_METADATA_STORAGE_TYPE: postgresql
-      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
-      DRUID_METADATA_STORAGE_PORT: 5434
-      DRUID_METADATA_STORAGE_DB: druid
-      DRUID_METADATA_STORAGE_USER: druid_user
-      DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_STORAGE_TYPE: hdfs
-      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
-    depends_on:
+    volumes:
+      - druid_shared:/opt/shared
+      - middle_var:/opt/druid/var
+    depends_on: 
+      - zookeeper
+      - druid-metadata-db
       - druid-coordinator
     ports:
       - "8093:8093"
+      - "8100-8105:8100-8105"
+    command:
+      - middleManager
+    env_file:
+      - druid-environment
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  druid-router:
+    image: apache/druid:31.0.0
+    container_name: druid-router
+    volumes:
+      - router_var:/opt/druid/var
+    depends_on:
+      - zookeeper
+      - druid-metadata-db
+      - druid-coordinator
+    ports:
+      - "8888:8888"
+    command:
+      - router
+    env_file:
+      - druid-environment
     logging:
       options:
         max-size: "10m"
@@ -333,6 +321,12 @@ services:
         max-file: "3"
 
 volumes:
+  middle_var: {}
+  historical_var: {}
+  broker_var: {}
+  coordinator_var: {}
+  router_var: {}
+  druid_shared: {}
   zookeeper_data:
     driver: local
     driver_opts:
