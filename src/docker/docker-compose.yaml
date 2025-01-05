@@ -54,6 +54,33 @@ services:
         target: /kafka/connect
         bind:
           create_host_path: true
+  druid-broker:
+    container_name: druid-broker
+    depends_on:
+      druid-coordinator:
+        condition: service_started
+        required: true
+    environment:
+      DRUID_METADATA_STORAGE_DB: druid
+      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
+      DRUID_METADATA_STORAGE_PASSWORD: druid_password
+      DRUID_METADATA_STORAGE_PORT: "5434"
+      DRUID_METADATA_STORAGE_TYPE: postgresql
+      DRUID_METADATA_STORAGE_USER: druid_user
+      DRUID_XMS: 4g
+      DRUID_XMX: 4g
+    image: apache/druid:27.0.0
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8092
+        published: "8092"
+        protocol: tcp
   druid-coordinator:
     container_name: druid-coordinator
     depends_on:
@@ -84,6 +111,42 @@ services:
         target: 8082
         published: "8082"
         protocol: tcp
+    volumes:
+      - type: bind
+        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\druid-config
+        target: /opt/druid/conf
+        bind:
+          create_host_path: true
+  druid-historical:
+    container_name: druid-historical
+    depends_on:
+      druid-coordinator:
+        condition: service_started
+        required: true
+    environment:
+      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
+      DRUID_METADATA_STORAGE_DB: druid
+      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
+      DRUID_METADATA_STORAGE_PASSWORD: druid_password
+      DRUID_METADATA_STORAGE_PORT: "5434"
+      DRUID_METADATA_STORAGE_TYPE: postgresql
+      DRUID_METADATA_STORAGE_USER: druid_user
+      DRUID_SEGMENT_WRITER_TYPE: parquet
+      DRUID_STORAGE_TYPE: hdfs
+      DRUID_XMS: 4g
+      DRUID_XMX: 4g
+    image: apache/druid:27.0.0
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8091
+        published: "8091"
+        protocol: tcp
   druid-metadata-db:
     container_name: druid-metadata-db
     environment:
@@ -107,6 +170,62 @@ services:
         source: druid_metadata_data
         target: /var/lib/postgresql/data
         volume: {}
+  druid-middlemanager:
+    container_name: druid-middlemanager
+    depends_on:
+      druid-coordinator:
+        condition: service_started
+        required: true
+    environment:
+      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
+      DRUID_METADATA_STORAGE_DB: druid
+      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
+      DRUID_METADATA_STORAGE_PASSWORD: druid_password
+      DRUID_METADATA_STORAGE_PORT: "5434"
+      DRUID_METADATA_STORAGE_TYPE: postgresql
+      DRUID_METADATA_STORAGE_USER: druid_user
+      DRUID_STORAGE_TYPE: hdfs
+      DRUID_XMS: 2g
+      DRUID_XMX: 2g
+    image: apache/druid:27.0.0
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8093
+        published: "8093"
+        protocol: tcp
+  druid-overlord:
+    container_name: druid-overlord
+    depends_on:
+      druid-coordinator:
+        condition: service_started
+        required: true
+    environment:
+      DRUID_METADATA_STORAGE_DB: druid
+      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
+      DRUID_METADATA_STORAGE_PASSWORD: druid_password
+      DRUID_METADATA_STORAGE_PORT: "5434"
+      DRUID_METADATA_STORAGE_TYPE: postgresql
+      DRUID_METADATA_STORAGE_USER: druid_user
+      DRUID_XMS: 2g
+      DRUID_XMX: 2g
+    image: apache/druid:27.0.0
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8090
+        published: "8090"
+        protocol: tcp
   dynamodb-source:
     container_name: dynamodb-source
     image: amazon/dynamodb-local
@@ -239,7 +358,9 @@ services:
   hdfs-namenode:
     container_name: hdfs-namenode
     environment:
+      CLUSTER_NAME: realtime-hadoop-cluster
       CORE_CONF_fs_defaultFS: hdfs://hdfs-namenode:9000
+      DFS_NAMESERVICES: realtime-hadoop-cluster
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     logging:
       options:
@@ -345,7 +466,7 @@ services:
         condition: service_started
         required: true
     environment:
-      KAFKA_BROKERS: kafka-broker1:9092,kafka-broker2:9094
+      KAFKA_BROKERS: http://localhost:9092,http://localhost:9094
     image: danielqsj/kafka-exporter:latest
     logging:
       options:
@@ -460,6 +581,7 @@ services:
       POSTHOG_DB_PORT: "5435"
       POSTHOG_DB_USER: posthog_user
       POSTHOG_REDIS_HOST: redis
+      SECRET_KEY: subhasmit
     image: posthog/posthog:latest
     logging:
       options:
