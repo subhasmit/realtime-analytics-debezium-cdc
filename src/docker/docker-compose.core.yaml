@@ -1,0 +1,304 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  kafka-broker1:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-broker1
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker1:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data_broker1:/var/lib/kafka
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka-broker2:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-broker2
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker2:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+    ports:
+      - "9094:9094"
+    volumes:
+      - kafka_data_broker2:/var/lib/kafka
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9094"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    container_name: schema-registry
+    depends_on:
+      - kafka-broker1
+      - kafka-broker2
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker1:9092,PLAINTEXT://kafka-broker2:9094
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8081:8081"
+    volumes:
+      - schema_registry_data:/var/lib/schema-registry
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  debezium-connect:
+    image: debezium/connect:3.0.0.Final
+    container_name: debezium-connect
+    depends_on:
+      - kafka-broker1
+      - kafka-broker2
+    environment:
+      BOOTSTRAP_SERVERS: kafka-broker1:9092,kafka-broker2:9094
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: debezium-config
+      OFFSET_STORAGE_TOPIC: debezium-offsets
+      STATUS_STORAGE_TOPIC: debezium-status
+      CONNECT_PLUGIN_PATH: /kafka/connect
+    ports:
+      - "8083:8083"
+    volumes:
+      - ../connect-plugins:/kafka/connect
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  hdfs-namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: hdfs-namenode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    volumes:
+      - hdfs_namenode_data:/hadoop/dfs/name
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  hdfs-datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: hdfs-datanode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+    depends_on:
+      - hdfs-namenode
+    ports:
+      - "9864:9864"
+    volumes:
+      - hdfs_datanode_data:/hadoop/dfs/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  druid-coordinator:
+    image: apache/druid:27.0.0
+    container_name: druid-coordinator
+    environment:
+      DRUID_XMX: 4g
+      DRUID_XMS: 4g
+      DRUID_METADATA_STORAGE_TYPE: postgresql
+      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
+      DRUID_METADATA_STORAGE_PORT: 5432
+      DRUID_METADATA_STORAGE_DB: druid
+      DRUID_METADATA_STORAGE_USER: druid_user
+      DRUID_METADATA_STORAGE_PASSWORD: druid_password
+      DRUID_STORAGE_TYPE: hdfs
+      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
+      DRUID_SEGMENT_WRITER_TYPE: parquet
+    depends_on:
+      - hdfs-namenode
+    ports:
+      - "8082:8082"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  druid-metadata-db:
+    image: postgres:latest
+    container_name: druid-metadata-db
+    environment:
+      POSTGRES_USER: druid_user
+      POSTGRES_PASSWORD: druid_password
+      POSTGRES_DB: druid
+    ports:
+      - "5432:5432"
+    volumes:
+      - druid_metadata_data:/var/lib/postgresql/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  flink-jobmanager:
+    image: flink:1.15.2
+    container_name: flink-jobmanager
+    command: jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+    ports:
+      - "8083:8081"
+    volumes:
+      - flink_data:/opt/flink/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  flink-taskmanager:
+    image: flink:1.15.2
+    container_name: flink-taskmanager
+    command: taskmanager
+    environment:
+      - TASK_MANAGER_NUMBER_OF_TASK_SLOTS=32
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+    depends_on:
+      - flink-jobmanager
+    ports:
+      - "8084:8081"
+    volumes:
+      - flink_data:/opt/flink/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  spark-master:
+    image: bitnami/spark:latest
+    container_name: spark-master
+    environment:
+      SPARK_MODE: master
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    volumes:
+      - spark_master_data:/opt/spark/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  spark-worker:
+    image: bitnami/spark:latest
+    container_name: spark-worker
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+    volumes:
+      - spark_worker_data:/opt/spark/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  zookeeper_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/zookeeper
+  kafka_data_broker1:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/kafka-broker1
+  kafka_data_broker2:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/kafka-broker2
+  hdfs_namenode_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/hdfs-namenode
+  hdfs_datanode_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/hdfs-datanode
+  schema_registry_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/schema-registry
+  druid_metadata_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/druid-metadata
+  flink_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/flink
+  spark_master_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/spark-master
+  spark_worker_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/spark-worker

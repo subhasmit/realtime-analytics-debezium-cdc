@@ -1,0 +1,157 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_PATHS_DASHBOARDS: /var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../grafana/provisioning:/etc/grafana/provisioning
+      - ../grafana/dashboards:/var/lib/grafana/dashboards
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ../alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  posthog:
+    image: posthog/posthog:latest
+    container_name: posthog
+    depends_on:
+      - redis
+      - posthog-db
+    environment:
+      POSTHOG_DB_NAME: posthog
+      POSTHOG_REDIS_HOST: redis
+      POSTHOG_DB_HOST: posthog-db
+      POSTHOG_DB_USER: posthog_user
+      POSTHOG_DB_PASSWORD: posthog_password
+    ports:
+      - "8000:8000"
+    volumes:
+      - posthog_data:/var/lib/posthog
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  posthog-db:
+    image: postgres:latest
+    container_name: posthog-db
+    environment:
+      POSTGRES_USER: posthog_user
+      POSTGRES_PASSWORD: posthog_password
+      POSTGRES_DB: posthog
+    ports:
+      - "5432:5432"
+    volumes:
+      - posthog_db_data:/var/lib/postgresql/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: kafka-exporter
+    depends_on:
+      - kafka-broker1
+      - kafka-broker2
+    environment:
+      KAFKA_BROKERS: "kafka-broker1:9092,kafka-broker2:9094"
+    ports:
+      - "9308:9308"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    environment:
+      REDIS_ADDR: redis:6379
+    ports:
+      - "9121:9121"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/grafana
+  posthog_db_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/posthog_db_data
+  posthog_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/posthog
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/redis

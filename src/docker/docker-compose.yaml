@@ -1,0 +1,818 @@
+name: docker
+services:
+  alertmanager:
+    container_name: alertmanager
+    image: prom/alertmanager:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9093
+        published: "9093"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\alertmanager\alertmanager.yml
+        target: /etc/alertmanager/alertmanager.yml
+        bind:
+          create_host_path: true
+  debezium-connect:
+    container_name: debezium-connect
+    depends_on:
+      kafka-broker1:
+        condition: service_started
+        required: true
+      kafka-broker2:
+        condition: service_started
+        required: true
+    environment:
+      BOOTSTRAP_SERVERS: kafka-broker1:9092,kafka-broker2:9094
+      CONFIG_STORAGE_TOPIC: debezium-config
+      CONNECT_PLUGIN_PATH: /kafka/connect
+      GROUP_ID: "1"
+      OFFSET_STORAGE_TOPIC: debezium-offsets
+      STATUS_STORAGE_TOPIC: debezium-status
+    image: debezium/connect:3.0.0.Final
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8083
+        published: "8083"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\connect-plugins
+        target: /kafka/connect
+        bind:
+          create_host_path: true
+  druid-coordinator:
+    container_name: druid-coordinator
+    depends_on:
+      hdfs-namenode:
+        condition: service_started
+        required: true
+    environment:
+      DRUID_HDFS_STORAGE_DIRECTORY: hdfs://hdfs-namenode:9000/druid/storage
+      DRUID_METADATA_STORAGE_DB: druid
+      DRUID_METADATA_STORAGE_HOST: druid-metadata-db
+      DRUID_METADATA_STORAGE_PASSWORD: druid_password
+      DRUID_METADATA_STORAGE_PORT: "5432"
+      DRUID_METADATA_STORAGE_TYPE: postgresql
+      DRUID_METADATA_STORAGE_USER: druid_user
+      DRUID_SEGMENT_WRITER_TYPE: parquet
+      DRUID_STORAGE_TYPE: hdfs
+      DRUID_XMS: 4g
+      DRUID_XMX: 4g
+    image: apache/druid:27.0.0
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8082
+        published: "8082"
+        protocol: tcp
+  druid-metadata-db:
+    container_name: druid-metadata-db
+    environment:
+      POSTGRES_DB: druid
+      POSTGRES_PASSWORD: druid_password
+      POSTGRES_USER: druid_user
+    image: postgres:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5432"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: druid_metadata_data
+        target: /var/lib/postgresql/data
+        volume: {}
+  dynamodb-source:
+    container_name: dynamodb-source
+    image: amazon/dynamodb-local
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8000
+        published: "8000"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: dynamodb_source_data
+        target: /data
+        volume: {}
+  flink-jobmanager:
+    command:
+      - jobmanager
+    container_name: flink-jobmanager
+    environment:
+      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
+    image: flink:1.15.2
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8081
+        published: "8083"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: flink_data
+        target: /opt/flink/data
+        volume: {}
+  flink-taskmanager:
+    command:
+      - taskmanager
+    container_name: flink-taskmanager
+    depends_on:
+      flink-jobmanager:
+        condition: service_started
+        required: true
+    environment:
+      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
+      TASK_MANAGER_NUMBER_OF_TASK_SLOTS: "32"
+    image: flink:1.15.2
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8081
+        published: "8084"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: flink_data
+        target: /opt/flink/data
+        volume: {}
+  grafana:
+    container_name: grafana
+    environment:
+      GF_PATHS_DASHBOARDS: /var/lib/grafana/dashboards
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+    image: grafana/grafana:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 3000
+        published: "3000"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: grafana_data
+        target: /var/lib/grafana
+        volume: {}
+      - type: bind
+        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\grafana\provisioning
+        target: /etc/grafana/provisioning
+        bind:
+          create_host_path: true
+      - type: bind
+        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\grafana\dashboards
+        target: /var/lib/grafana/dashboards
+        bind:
+          create_host_path: true
+  hdfs-datanode:
+    container_name: hdfs-datanode
+    depends_on:
+      hdfs-namenode:
+        condition: service_started
+        required: true
+    environment:
+      CORE_CONF_fs_defaultFS: hdfs://hdfs-namenode:9000
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9864
+        published: "9864"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: hdfs_datanode_data
+        target: /hadoop/dfs/data
+        volume: {}
+  hdfs-namenode:
+    container_name: hdfs-namenode
+    environment:
+      CORE_CONF_fs_defaultFS: hdfs://hdfs-namenode:9000
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9870
+        published: "9870"
+        protocol: tcp
+      - mode: ingress
+        target: 9000
+        published: "9000"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: hdfs_namenode_data
+        target: /hadoop/dfs/name
+        volume: {}
+  kafka-broker1:
+    container_name: kafka-broker1
+    depends_on:
+      zookeeper:
+        condition: service_started
+        required: true
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker1:9092
+      KAFKA_BROKER_ID: "1"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "2"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - echo > /dev/tcp/localhost/9092
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: confluentinc/cp-kafka:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9092
+        published: "9092"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: kafka_data_broker1
+        target: /var/lib/kafka
+        volume: {}
+  kafka-broker2:
+    container_name: kafka-broker2
+    depends_on:
+      zookeeper:
+        condition: service_started
+        required: true
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker2:9094
+      KAFKA_BROKER_ID: "2"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "2"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - echo > /dev/tcp/localhost/9094
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: confluentinc/cp-kafka:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9094
+        published: "9094"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: kafka_data_broker2
+        target: /var/lib/kafka
+        volume: {}
+  kafka-exporter:
+    container_name: kafka-exporter
+    depends_on:
+      kafka-broker1:
+        condition: service_started
+        required: true
+      kafka-broker2:
+        condition: service_started
+        required: true
+    environment:
+      KAFKA_BROKERS: kafka-broker1:9092,kafka-broker2:9094
+    image: danielqsj/kafka-exporter:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9308
+        published: "9308"
+        protocol: tcp
+  mysql-source:
+    container_name: mysql-source
+    environment:
+      MYSQL_DATABASE: sourcedb
+      MYSQL_ROOT_PASSWORD: root
+    image: mysql:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 3306
+        published: "3307"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: mysql_source_data
+        target: /var/lib/mysql
+        volume: {}
+  node-exporter:
+    container_name: node-exporter
+    image: prom/node-exporter:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9100
+        published: "9100"
+        protocol: tcp
+  oracle-source:
+    container_name: oracle-source
+    environment:
+      APP_USER: appuser
+      APP_USER_PASSWORD: appuser
+      ORACLE_PASSWORD: oracle
+    image: gvenzl/oracle-xe:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 1521
+        published: "1522"
+        protocol: tcp
+      - mode: ingress
+        target: 5500
+        published: "5501"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: oracle_source_data
+        target: /opt/oracle
+        volume: {}
+  postgres-source:
+    container_name: postgres-source
+    environment:
+      POSTGRES_DB: sourcedb
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    image: postgres:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5433"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: postgres_source_data
+        target: /var/lib/postgresql/data
+        volume: {}
+  posthog:
+    container_name: posthog
+    depends_on:
+      posthog-db:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      POSTHOG_DB_HOST: posthog-db
+      POSTHOG_DB_NAME: posthog
+      POSTHOG_DB_PASSWORD: posthog_password
+      POSTHOG_DB_USER: posthog_user
+      POSTHOG_REDIS_HOST: redis
+    image: posthog/posthog:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8000
+        published: "8000"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: posthog_data
+        target: /var/lib/posthog
+        volume: {}
+  posthog-db:
+    container_name: posthog-db
+    environment:
+      POSTGRES_DB: posthog
+      POSTGRES_PASSWORD: posthog_password
+      POSTGRES_USER: posthog_user
+    image: postgres:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5432"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: posthog_db_data
+        target: /var/lib/postgresql/data
+        volume: {}
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9090
+        published: "9090"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\prometheus\prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        bind:
+          create_host_path: true
+  redis:
+    container_name: redis
+    image: redis:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: redis_data
+        target: /data
+        volume: {}
+  redis-exporter:
+    container_name: redis-exporter
+    environment:
+      REDIS_ADDR: redis:6379
+    image: oliver006/redis_exporter:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9121
+        published: "9121"
+        protocol: tcp
+  schema-registry:
+    container_name: schema-registry
+    depends_on:
+      kafka-broker1:
+        condition: service_started
+        required: true
+      kafka-broker2:
+        condition: service_started
+        required: true
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker1:9092,PLAINTEXT://kafka-broker2:9094
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    image: confluentinc/cp-schema-registry:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8081
+        published: "8081"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: schema_registry_data
+        target: /var/lib/schema-registry
+        volume: {}
+  spark-master:
+    container_name: spark-master
+    environment:
+      SPARK_MODE: master
+    image: bitnami/spark:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 7077
+        published: "7077"
+        protocol: tcp
+      - mode: ingress
+        target: 8080
+        published: "8080"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: spark_master_data
+        target: /opt/spark/data
+        volume: {}
+  spark-worker:
+    container_name: spark-worker
+    depends_on:
+      spark-master:
+        condition: service_started
+        required: true
+    environment:
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_MODE: worker
+    image: bitnami/spark:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8081
+        published: "8081"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: spark_worker_data
+        target: /opt/spark/data
+        volume: {}
+  sqlserver-source:
+    container_name: sqlserver-source
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: YourStrongPassword1
+    image: mcr.microsoft.com/mssql/server:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 1433
+        published: "1434"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: sqlserver_source_data
+        target: /var/opt/mssql
+        volume: {}
+  zookeeper:
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_TICK_TIME: "2000"
+    image: confluentinc/cp-zookeeper:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 2181
+        published: "2181"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: zookeeper_data
+        target: /var/lib/zookeeper
+        volume: {}
+networks:
+  default:
+    name: docker_default
+volumes:
+  druid_metadata_data:
+    name: docker_druid_metadata_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/druid-metadata
+      o: bind
+      type: none
+  dynamodb_source_data:
+    name: docker_dynamodb_source_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/dynamodb
+      o: bind
+      type: none
+  flink_data:
+    name: docker_flink_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/flink
+      o: bind
+      type: none
+  grafana_data:
+    name: docker_grafana_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/grafana
+      o: bind
+      type: none
+  hdfs_datanode_data:
+    name: docker_hdfs_datanode_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/hdfs-datanode
+      o: bind
+      type: none
+  hdfs_namenode_data:
+    name: docker_hdfs_namenode_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/hdfs-namenode
+      o: bind
+      type: none
+  kafka_data_broker1:
+    name: docker_kafka_data_broker1
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/kafka-broker1
+      o: bind
+      type: none
+  kafka_data_broker2:
+    name: docker_kafka_data_broker2
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/kafka-broker2
+      o: bind
+      type: none
+  mysql_source_data:
+    name: docker_mysql_source_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/mysql
+      o: bind
+      type: none
+  oracle_source_data:
+    name: docker_oracle_source_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/oracle
+      o: bind
+      type: none
+  postgres_source_data:
+    name: docker_postgres_source_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/postgres
+      o: bind
+      type: none
+  posthog_data:
+    name: docker_posthog_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/posthog
+      o: bind
+      type: none
+  posthog_db_data:
+    name: docker_posthog_db_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/posthog_db_data
+      o: bind
+      type: none
+  redis_data:
+    name: docker_redis_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/redis
+      o: bind
+      type: none
+  schema_registry_data:
+    name: docker_schema_registry_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/schema-registry
+      o: bind
+      type: none
+  spark_master_data:
+    name: docker_spark_master_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/spark-master
+      o: bind
+      type: none
+  spark_worker_data:
+    name: docker_spark_worker_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/spark-worker
+      o: bind
+      type: none
+  sqlserver_source_data:
+    name: docker_sqlserver_source_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/sqlserver
+      o: bind
+      type: none
+  zookeeper_data:
+    name: docker_zookeeper_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/zookeeper
+      o: bind
+      type: none

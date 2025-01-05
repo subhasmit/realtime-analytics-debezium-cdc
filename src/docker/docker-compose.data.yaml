@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  postgres-source:
+    image: postgres:latest
+    container_name: postgres-source
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sourcedb
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_source_data:/var/lib/postgresql/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mysql-source:
+    image: mysql:latest
+    container_name: mysql-source
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sourcedb
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_source_data:/var/lib/mysql
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  oracle-source:
+    image: gvenzl/oracle-xe:latest
+    container_name: oracle-source
+    environment:
+      ORACLE_PASSWORD: oracle
+      APP_USER: appuser
+      APP_USER_PASSWORD: appuser
+    ports:
+      - "1522:1521"
+      - "5501:5500"
+    volumes:
+      - oracle_source_data:/opt/oracle
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  sqlserver-source:
+    image: mcr.microsoft.com/mssql/server:latest
+    container_name: sqlserver-source
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourStrongPassword1"
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver_source_data:/var/opt/mssql
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  dynamodb-source:
+    image: amazon/dynamodb-local
+    container_name: dynamodb-source
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb_source_data:/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_source_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/postgres
+  mysql_source_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/mysql
+  oracle_source_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/oracle
+  sqlserver_source_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/sqlserver
+  dynamodb_source_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/dynamodb
