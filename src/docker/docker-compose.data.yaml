@@ -68,7 +68,7 @@ services:
     image: amazon/dynamodb-local
     container_name: dynamodb-source
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
       - dynamodb_source_data:/data
     logging:

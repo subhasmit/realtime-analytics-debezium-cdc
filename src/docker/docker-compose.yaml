@@ -45,8 +45,8 @@ services:
       default: null
     ports:
       - mode: ingress
-        target: 8083
-        published: "8083"
+        target: 8089
+        published: "8089"
         protocol: tcp
     volumes:
       - type: bind
@@ -65,7 +65,7 @@ services:
       DRUID_METADATA_STORAGE_DB: druid
       DRUID_METADATA_STORAGE_HOST: druid-metadata-db
       DRUID_METADATA_STORAGE_PASSWORD: druid_password
-      DRUID_METADATA_STORAGE_PORT: "5432"
+      DRUID_METADATA_STORAGE_PORT: "5434"
       DRUID_METADATA_STORAGE_TYPE: postgresql
       DRUID_METADATA_STORAGE_USER: druid_user
       DRUID_SEGMENT_WRITER_TYPE: parquet
@@ -99,8 +99,8 @@ services:
       default: null
     ports:
       - mode: ingress
-        target: 5432
-        published: "5432"
+        target: 5434
+        published: "5434"
         protocol: tcp
     volumes:
       - type: volume
@@ -118,8 +118,8 @@ services:
       default: null
     ports:
       - mode: ingress
-        target: 8000
-        published: "8000"
+        target: 8001
+        published: "8001"
         protocol: tcp
     volumes:
       - type: volume
@@ -457,6 +457,7 @@ services:
       POSTHOG_DB_HOST: posthog-db
       POSTHOG_DB_NAME: posthog
       POSTHOG_DB_PASSWORD: posthog_password
+      POSTHOG_DB_PORT: "5435"
       POSTHOG_DB_USER: posthog_user
       POSTHOG_REDIS_HOST: redis
     image: posthog/posthog:latest
@@ -491,8 +492,8 @@ services:
       default: null
     ports:
       - mode: ingress
-        target: 5432
-        published: "5432"
+        target: 5435
+        published: "5435"
         protocol: tcp
     volumes:
       - type: volume
@@ -566,7 +567,7 @@ services:
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker1:9092,PLAINTEXT://kafka-broker2:9094
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8086
     image: confluentinc/cp-schema-registry:latest
     logging:
       options:
@@ -576,8 +577,8 @@ services:
       default: null
     ports:
       - mode: ingress
-        target: 8081
-        published: "8081"
+        target: 8086
+        published: "8086"
         protocol: tcp
     volumes:
       - type: volume
@@ -627,8 +628,8 @@ services:
       default: null
     ports:
       - mode: ingress
-        target: 8081
-        published: "8081"
+        target: 8085
+        published: "8085"
         protocol: tcp
     volumes:
       - type: volume
