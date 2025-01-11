@@ -1,0 +1,9 @@
+{
+    "name": "crop-yield-connector",
+    "config": {
+        "connector.class": "org.apache.kafka.connect.file.FileStreamSourceConnector",
+        "tasks.max": "1",
+        "file": "/data/Enhanced_Indian_Crop_Yield_Weekly_Data.csv",
+        "topic": "crop-yield-topic"
+    }
+}
