@@ -1,0 +1,29 @@
+{
+    "type": "index_parallel",
+    "spec": {
+        "dataSchema": {
+            "dataSource": "crop_yield_fact",
+            "timestampSpec": {
+                "column": "week_start_date",
+                "format": "yyyy-MM-dd"
+            },
+            "dimensionsSpec": {
+                "dimensions": [
+                    "week_id", "field_id", "crop_id", "region_id",
+                    "profitability_index", "market_demand_tons", "export_potential_tons"
+                ]
+            }
+        },
+        "ioConfig": {
+            "type": "hadoop",
+            "inputSpec": {
+                "type": "static",
+                "paths": "hdfs://namenode:9000/druid/crop_yield_fact"
+            }
+        },
+        "tuningConfig": {
+            "type": "index_parallel",
+            "maxNumConcurrentSubTasks": 4
+        }
+    }
+}
