@@ -535,7 +535,10 @@ services:
     environment:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker1:9092
       KAFKA_BROKER_ID: "1"
+      KAFKA_FETCH_MAX_BYTES: "4194304"
+      KAFKA_MESSAGE_MAX_BYTES: "4194304"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "2"
+      KAFKA_REPLICA_FETCH_MAX_BYTES: "4194304"
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     healthcheck:
       test:
@@ -572,7 +575,10 @@ services:
     environment:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker2:9094
       KAFKA_BROKER_ID: "2"
+      KAFKA_FETCH_MAX_BYTES: "4194304"
+      KAFKA_MESSAGE_MAX_BYTES: "4194304"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "2"
+      KAFKA_REPLICA_FETCH_MAX_BYTES: "4194304"
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     healthcheck:
       test:
@@ -599,6 +605,48 @@ services:
       - type: volume
         source: kafka_data_broker2
         target: /var/lib/kafka
+        volume: {}
+  kafka-connect-csv:
+    container_name: kafka-connect-csv
+    depends_on:
+      kafka-broker1:
+        condition: service_started
+        required: true
+      kafka-broker2:
+        condition: service_started
+        required: true
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka-broker1:9092,kafka-broker2:9094
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
+      CONNECT_GROUP_ID: connect-cluster
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
+      CONNECT_PLUGIN_PATH: /usr/share/java,/etc/kafka-connect/jars
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect-csv
+      CONNECT_STATUS_STORAGE_TOPIC: connect-status
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    image: confluentinc/cp-kafka-connect:latest
+    logging:
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8201
+        published: "8201"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\connect-plugins
+        target: /etc/kafka-connect/jars
+        bind:
+          create_host_path: true
+      - type: volume
+        source: csv_data
+        target: /data
         volume: {}
   kafka-exporter:
     container_name: kafka-exporter
@@ -876,9 +924,22 @@ services:
         source: spark_master_data
         target: /opt/spark/data
         volume: {}
-  spark-worker:
-    container_name: spark-worker
+  spark-preprocessing:
+    command:
+      - /opt/bitnami/spark/bin/spark-submit
+      - --master
+      - spark://spark-master:7077
+      - --conf
+      - spark.hadoop.fs.defaultFS=hdfs://hdfs-namenode:9000
+      - /app/spark_preprocessing.py
+    container_name: spark-preprocessing
     depends_on:
+      hdfs-namenode:
+        condition: service_started
+        required: true
+      kafka-broker1:
+        condition: service_started
+        required: true
       spark-master:
         condition: service_started
         required: true
@@ -902,6 +963,11 @@ services:
         source: spark_worker_data
         target: /opt/spark/data
         volume: {}
+      - type: bind
+        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\spark_jobs
+        target: /app
+        bind:
+          create_host_path: true
   sqlserver-source:
     container_name: sqlserver-source
     environment:
@@ -927,7 +993,9 @@ services:
   zookeeper:
     container_name: zookeeper
     environment:
+      ZOO_MAX_BUFFER_SIZE: "4194304"
       ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_JUTE_MAXBUFFER: "4194304"
       ZOOKEEPER_TICK_TIME: "2000"
     image: confluentinc/cp-zookeeper:latest
     logging:
@@ -954,6 +1022,13 @@ volumes:
     name: docker_broker_var
   coordinator_var:
     name: docker_coordinator_var
+  csv_data:
+    name: docker_csv_data
+    driver: local
+    driver_opts:
+      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/csv-data
+      o: bind
+      type: none
   druid_metadata_data:
     name: docker_druid_metadata_data
     driver: local

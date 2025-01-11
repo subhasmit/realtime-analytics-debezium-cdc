@@ -5,6 +5,8 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOO_MAX_BUFFER_SIZE: 4194304
+      ZOOKEEPER_JUTE_MAXBUFFER: 4194304
     ports:
       - "2181:2181"
     volumes:
@@ -24,6 +26,9 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker1:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_MESSAGE_MAX_BYTES: 4194304
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 4194304
+      KAFKA_FETCH_MAX_BYTES: 4194304
     ports:
       - "9092:9092"
     volumes:
@@ -48,6 +53,9 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker2:9094
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_MESSAGE_MAX_BYTES: 4194304
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 4194304
+      KAFKA_FETCH_MAX_BYTES: 4194304
     ports:
       - "9094:9094"
     volumes:
@@ -76,28 +84,6 @@ services:
       - "8086:8086"
     volumes:
       - schema_registry_data:/var/lib/schema-registry
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  debezium-connect:
-    image: debezium/connect:3.0.0.Final
-    container_name: debezium-connect
-    depends_on:
-      - kafka-broker1
-      - kafka-broker2
-    environment:
-      BOOTSTRAP_SERVERS: kafka-broker1:9092,kafka-broker2:9094
-      GROUP_ID: 1
-      CONFIG_STORAGE_TOPIC: debezium-config
-      OFFSET_STORAGE_TOPIC: debezium-offsets
-      STATUS_STORAGE_TOPIC: debezium-status
-      CONNECT_PLUGIN_PATH: /kafka/connect
-    ports:
-      - "8089:8089"
-    volumes:
-      - ../connect-plugins:/kafka/connect
     logging:
       options:
         max-size: "10m"
@@ -303,18 +289,26 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  spark-worker:
+  spark-preprocessing:
     image: bitnami/spark:latest
-    container_name: spark-worker
+    container_name: spark-preprocessing
     environment:
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077
     depends_on:
+      - kafka-broker1
       - spark-master
+      - hdfs-namenode
     ports:
       - "8085:8085"
+    command: >
+      /opt/bitnami/spark/bin/spark-submit
+      --master spark://spark-master:7077
+      --conf spark.hadoop.fs.defaultFS=hdfs://hdfs-namenode:9000
+      /app/spark_preprocessing.py
     volumes:
       - spark_worker_data:/opt/spark/data
+      - ../spark_jobs:/app
     logging:
       options:
         max-size: "10m"
@@ -340,7 +334,7 @@ services:
       - "8201:8201"
     volumes:
       - ../connect-plugins:/etc/kafka-connect/jars
-      - csv-data:/data
+      - csv_data:/data
     logging:
       options:
         max-size: "10m"
