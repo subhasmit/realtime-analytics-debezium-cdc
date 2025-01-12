@@ -37,11 +37,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   kafka-broker2:
     image: confluentinc/cp-kafka:latest
@@ -60,30 +55,6 @@ services:
       - "9094:9094"
     volumes:
       - kafka_data_broker2:/var/lib/kafka
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9094"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  schema-registry:
-    image: confluentinc/cp-schema-registry:latest
-    container_name: schema-registry
-    depends_on:
-      - kafka-broker1
-      - kafka-broker2
-    environment:
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker1:9092,PLAINTEXT://kafka-broker2:9094
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8086
-    ports:
-      - "8086:8086"
-    volumes:
-      - schema_registry_data:/var/lib/schema-registry
     logging:
       options:
         max-size: "10m"
@@ -313,6 +284,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
   kafka-connect-csv:
     image: confluentinc/cp-kafka-connect:latest
     container_name: kafka-connect-csv

@@ -20,40 +20,6 @@ services:
         target: /etc/alertmanager/alertmanager.yml
         bind:
           create_host_path: true
-  debezium-connect:
-    container_name: debezium-connect
-    depends_on:
-      kafka-broker1:
-        condition: service_started
-        required: true
-      kafka-broker2:
-        condition: service_started
-        required: true
-    environment:
-      BOOTSTRAP_SERVERS: kafka-broker1:9092,kafka-broker2:9094
-      CONFIG_STORAGE_TOPIC: debezium-config
-      CONNECT_PLUGIN_PATH: /kafka/connect
-      GROUP_ID: "1"
-      OFFSET_STORAGE_TOPIC: debezium-offsets
-      STATUS_STORAGE_TOPIC: debezium-status
-    image: debezium/connect:3.0.0.Final
-    logging:
-      options:
-        max-file: "3"
-        max-size: 10m
-    networks:
-      default: null
-    ports:
-      - mode: ingress
-        target: 8089
-        published: "8089"
-        protocol: tcp
-    volumes:
-      - type: bind
-        source: F:\DissertationLab\realtime-analytics-debezium-cdc\src\connect-plugins
-        target: /kafka/connect
-        bind:
-          create_host_path: true
   druid-broker:
     command:
       - broker
@@ -370,25 +336,6 @@ services:
         source: router_var
         target: /opt/druid/var
         volume: {}
-  dynamodb-source:
-    container_name: dynamodb-source
-    image: amazon/dynamodb-local
-    logging:
-      options:
-        max-file: "3"
-        max-size: 10m
-    networks:
-      default: null
-    ports:
-      - mode: ingress
-        target: 8001
-        published: "8001"
-        protocol: tcp
-    volumes:
-      - type: volume
-        source: dynamodb_source_data
-        target: /data
-        volume: {}
   flink-jobmanager:
     command:
       - jobmanager
@@ -540,15 +487,6 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "2"
       KAFKA_REPLICA_FETCH_MAX_BYTES: "4194304"
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-    healthcheck:
-      test:
-        - CMD
-        - bash
-        - -c
-        - echo > /dev/tcp/localhost/9092
-      timeout: 5s
-      interval: 10s
-      retries: 5
     image: confluentinc/cp-kafka:latest
     logging:
       options:
@@ -580,15 +518,6 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "2"
       KAFKA_REPLICA_FETCH_MAX_BYTES: "4194304"
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-    healthcheck:
-      test:
-        - CMD
-        - bash
-        - -c
-        - echo > /dev/tcp/localhost/9094
-      timeout: 5s
-      interval: 10s
-      retries: 5
     image: confluentinc/cp-kafka:latest
     logging:
       options:
@@ -671,28 +600,6 @@ services:
         target: 9308
         published: "9308"
         protocol: tcp
-  mysql-source:
-    container_name: mysql-source
-    environment:
-      MYSQL_DATABASE: sourcedb
-      MYSQL_ROOT_PASSWORD: root
-    image: mysql:latest
-    logging:
-      options:
-        max-file: "3"
-        max-size: 10m
-    networks:
-      default: null
-    ports:
-      - mode: ingress
-        target: 3306
-        published: "3307"
-        protocol: tcp
-    volumes:
-      - type: volume
-        source: mysql_source_data
-        target: /var/lib/mysql
-        volume: {}
   node-exporter:
     container_name: node-exporter
     image: prom/node-exporter:latest
@@ -707,56 +614,6 @@ services:
         target: 9100
         published: "9100"
         protocol: tcp
-  oracle-source:
-    container_name: oracle-source
-    environment:
-      APP_USER: appuser
-      APP_USER_PASSWORD: appuser
-      ORACLE_PASSWORD: oracle
-    image: gvenzl/oracle-xe:latest
-    logging:
-      options:
-        max-file: "3"
-        max-size: 10m
-    networks:
-      default: null
-    ports:
-      - mode: ingress
-        target: 1521
-        published: "1522"
-        protocol: tcp
-      - mode: ingress
-        target: 5500
-        published: "5501"
-        protocol: tcp
-    volumes:
-      - type: volume
-        source: oracle_source_data
-        target: /opt/oracle
-        volume: {}
-  postgres-source:
-    container_name: postgres-source
-    environment:
-      POSTGRES_DB: sourcedb
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-    image: postgres:latest
-    logging:
-      options:
-        max-file: "3"
-        max-size: 10m
-    networks:
-      default: null
-    ports:
-      - mode: ingress
-        target: 5432
-        published: "5433"
-        protocol: tcp
-    volumes:
-      - type: volume
-        source: postgres_source_data
-        target: /var/lib/postgresql/data
-        volume: {}
   posthog:
     container_name: posthog
     depends_on:
@@ -869,36 +726,6 @@ services:
         target: 9121
         published: "9121"
         protocol: tcp
-  schema-registry:
-    container_name: schema-registry
-    depends_on:
-      kafka-broker1:
-        condition: service_started
-        required: true
-      kafka-broker2:
-        condition: service_started
-        required: true
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka-broker1:9092,PLAINTEXT://kafka-broker2:9094
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8086
-    image: confluentinc/cp-schema-registry:latest
-    logging:
-      options:
-        max-file: "3"
-        max-size: 10m
-    networks:
-      default: null
-    ports:
-      - mode: ingress
-        target: 8086
-        published: "8086"
-        protocol: tcp
-    volumes:
-      - type: volume
-        source: schema_registry_data
-        target: /var/lib/schema-registry
-        volume: {}
   spark-master:
     container_name: spark-master
     environment:
@@ -968,28 +795,6 @@ services:
         target: /app
         bind:
           create_host_path: true
-  sqlserver-source:
-    container_name: sqlserver-source
-    environment:
-      ACCEPT_EULA: "Y"
-      SA_PASSWORD: YourStrongPassword1
-    image: mcr.microsoft.com/mssql/server:latest
-    logging:
-      options:
-        max-file: "3"
-        max-size: 10m
-    networks:
-      default: null
-    ports:
-      - mode: ingress
-        target: 1433
-        published: "1434"
-        protocol: tcp
-    volumes:
-      - type: volume
-        source: sqlserver_source_data
-        target: /var/opt/mssql
-        volume: {}
   zookeeper:
     container_name: zookeeper
     environment:
@@ -1038,13 +843,6 @@ volumes:
       type: none
   druid_shared:
     name: docker_druid_shared
-  dynamodb_source_data:
-    name: docker_dynamodb_source_data
-    driver: local
-    driver_opts:
-      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/dynamodb
-      o: bind
-      type: none
   flink_data:
     name: docker_flink_data
     driver: local
@@ -1091,27 +889,6 @@ volumes:
       type: none
   middle_var:
     name: docker_middle_var
-  mysql_source_data:
-    name: docker_mysql_source_data
-    driver: local
-    driver_opts:
-      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/mysql
-      o: bind
-      type: none
-  oracle_source_data:
-    name: docker_oracle_source_data
-    driver: local
-    driver_opts:
-      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/oracle
-      o: bind
-      type: none
-  postgres_source_data:
-    name: docker_postgres_source_data
-    driver: local
-    driver_opts:
-      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/postgres
-      o: bind
-      type: none
   posthog_data:
     name: docker_posthog_data
     driver: local
@@ -1135,13 +912,6 @@ volumes:
       type: none
   router_var:
     name: docker_router_var
-  schema_registry_data:
-    name: docker_schema_registry_data
-    driver: local
-    driver_opts:
-      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/schema-registry
-      o: bind
-      type: none
   spark_master_data:
     name: docker_spark_master_data
     driver: local
@@ -1154,13 +924,6 @@ volumes:
     driver: local
     driver_opts:
       device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/spark-worker
-      o: bind
-      type: none
-  sqlserver_source_data:
-    name: docker_sqlserver_source_data
-    driver: local
-    driver_opts:
-      device: F:/DissertationLab/realtime-analytics-debezium-cdc/docker-data/sqlserver
       o: bind
       type: none
   zookeeper_data:
