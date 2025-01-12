@@ -1,0 +1,79 @@
+{
+    "type": "index_hadoop",
+    "spec": {
+      "dataSchema": {
+        "dataSource": "crop_yield_data",
+        "parser": {
+          "type": "hadoopyString",
+          "parseSpec": {
+            "format": "json",
+            "timestampSpec": {
+              "column": "week_start_date",
+              "format": "yyyy-MM-dd"
+            },
+            "dimensionsSpec": {
+              "dimensions": [
+                "region",
+                "state",
+                "district",
+                "crop_name",
+                "crop_type",
+                "crop_season"
+              ],
+              "dimensionExclusions": [],
+              "spatialDimensions": []
+            }
+          }
+        },
+        "metricsSpec": [
+          {
+            "type": "count",
+            "name": "count"
+          },
+          {
+            "type": "doubleSum",
+            "name": "yield_kg_per_hectare",
+            "fieldName": "yield_kg_per_hectare"
+          },
+          {
+            "type": "doubleSum",
+            "name": "rainfall_mm",
+            "fieldName": "rainfall_mm"
+          },
+          {
+            "type": "doubleSum",
+            "name": "temperature_celsius",
+            "fieldName": "temperature_celsius"
+          },
+          {
+            "type": "doubleSum",
+            "name": "humidity_percent",
+            "fieldName": "humidity_percent"
+          },
+          {
+            "type": "doubleSum",
+            "name": "market_price_per_kg",
+            "fieldName": "market_price_per_kg"
+          }
+        ],
+        "granularitySpec": {
+          "type": "uniform",
+          "segmentGranularity": "DAY",
+          "queryGranularity": "NONE",
+          "intervals": ["2025-01-01/2025-12-31"]
+        }
+      },
+      "ioConfig": {
+        "type": "hadoop",
+        "inputSpec": {
+          "type": "static",
+          "paths": "/data/transformed/"
+        }
+      },
+      "tuningConfig": {
+        "type": "hadoop"
+      }
+    },
+    "hadoopDependencyCoordinates": ["org.apache.hadoop:hadoop-client:3.2.1"]
+  }
+  
