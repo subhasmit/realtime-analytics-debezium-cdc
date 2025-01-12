@@ -1,79 +1,358 @@
 {
-    "type": "index_hadoop",
-    "spec": {
-      "dataSchema": {
-        "dataSource": "crop_yield_data",
-        "parser": {
-          "type": "hadoopyString",
-          "parseSpec": {
-            "format": "json",
-            "timestampSpec": {
-              "column": "week_start_date",
-              "format": "yyyy-MM-dd"
-            },
-            "dimensionsSpec": {
-              "dimensions": [
-                "region",
-                "state",
-                "district",
-                "crop_name",
-                "crop_type",
-                "crop_season"
-              ],
-              "dimensionExclusions": [],
-              "spatialDimensions": []
-            }
-          }
-        },
-        "metricsSpec": [
+    "type": "index_kafka",
+    "id": "index_kafka_crop-data-topic_16b5d4207f026ae_kfhpjcpj",
+    "resource": {
+      "availabilityGroup": "index_kafka_crop-data-topic_16b5d4207f026ae",
+      "requiredCapacity": 1
+    },
+    "dataSchema": {
+      "dataSource": "crop-data-topic",
+      "timestampSpec": {
+        "column": "week_start_date",
+        "format": "auto",
+        "missingValue": null
+      },
+      "dimensionsSpec": {
+        "dimensions": [
           {
-            "type": "count",
-            "name": "count"
+            "type": "string",
+            "name": "week_end_date",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
           },
           {
-            "type": "doubleSum",
+            "type": "string",
+            "name": "region",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "string",
+            "name": "state",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "string",
+            "name": "district",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "string",
+            "name": "crop_name",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "string",
+            "name": "crop_type",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "string",
+            "name": "crop_season",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "double",
             "name": "yield_kg_per_hectare",
-            "fieldName": "yield_kg_per_hectare"
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
           },
           {
-            "type": "doubleSum",
+            "type": "string",
+            "name": "planting_date",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "string",
+            "name": "growth_stage",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "double",
+            "name": "soil_nitrogen_ppm",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "soil_phosphorus_ppm",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "soil_potassium_ppm",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "string",
+            "name": "npk_ratio",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "double",
+            "name": "soil_moisture_percent",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "string",
+            "name": "crop_rotation_previous_crop",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "double",
             "name": "rainfall_mm",
-            "fieldName": "rainfall_mm"
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
           },
           {
-            "type": "doubleSum",
+            "type": "double",
             "name": "temperature_celsius",
-            "fieldName": "temperature_celsius"
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
           },
           {
-            "type": "doubleSum",
-            "name": "humidity_percent",
-            "fieldName": "humidity_percent"
+            "type": "double",
+            "name": "wind_speed_kmph",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
           },
           {
-            "type": "doubleSum",
+            "type": "string",
+            "name": "fertilizer_used",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "double",
+            "name": "fertilizer_quantity_kg_per_hectare",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
             "name": "market_price_per_kg",
-            "fieldName": "market_price_per_kg"
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "crop_inflation_percent",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "profitability_index",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "humidity_percent",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "solar_radiation_mj_per_m2",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "string",
+            "name": "pesticide_used",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": true
+          },
+          {
+            "type": "double",
+            "name": "pesticide_quantity_liters_per_hectare",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "labor_hours_per_hectare",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "crop_quality_index",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "water_usage_cubic_meters_per_hectare",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "market_demand_tons",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "export_potential_tons",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
+          },
+          {
+            "type": "double",
+            "name": "climate_risk_index",
+            "multiValueHandling": "SORTED_ARRAY",
+            "createBitmapIndex": false
           }
         ],
-        "granularitySpec": {
-          "type": "uniform",
-          "segmentGranularity": "DAY",
-          "queryGranularity": "NONE",
-          "intervals": ["2025-01-01/2025-12-31"]
-        }
+        "dimensionExclusions": [
+          "__time",
+          "week_start_date"
+        ],
+        "includeAllDimensions": false,
+        "useSchemaDiscovery": false
       },
-      "ioConfig": {
-        "type": "hadoop",
-        "inputSpec": {
-          "type": "static",
-          "paths": "/data/transformed/"
-        }
+      "metricsSpec": [],
+      "granularitySpec": {
+        "type": "uniform",
+        "segmentGranularity": "DAY",
+        "queryGranularity": {
+          "type": "none"
+        },
+        "rollup": false,
+        "intervals": []
       },
-      "tuningConfig": {
-        "type": "hadoop"
+      "transformSpec": {
+        "filter": null,
+        "transforms": []
       }
     },
-    "hadoopDependencyCoordinates": ["org.apache.hadoop:hadoop-client:3.2.1"]
+    "tuningConfig": {
+      "type": "KafkaTuningConfig",
+      "appendableIndexSpec": {
+        "type": "onheap",
+        "preserveExistingMetrics": false
+      },
+      "maxRowsInMemory": 150000,
+      "maxBytesInMemory": 0,
+      "skipBytesInMemoryOverheadCheck": false,
+      "maxRowsPerSegment": 5000000,
+      "maxTotalRows": null,
+      "intermediatePersistPeriod": "PT10M",
+      "maxPendingPersists": 0,
+      "indexSpec": {
+        "bitmap": {
+          "type": "roaring"
+        },
+        "dimensionCompression": "lz4",
+        "stringDictionaryEncoding": {
+          "type": "utf8"
+        },
+        "metricCompression": "lz4",
+        "longEncoding": "longs"
+      },
+      "indexSpecForIntermediatePersists": {
+        "bitmap": {
+          "type": "roaring"
+        },
+        "dimensionCompression": "lz4",
+        "stringDictionaryEncoding": {
+          "type": "utf8"
+        },
+        "metricCompression": "lz4",
+        "longEncoding": "longs"
+      },
+      "reportParseExceptions": false,
+      "handoffConditionTimeout": 900000,
+      "resetOffsetAutomatically": false,
+      "segmentWriteOutMediumFactory": null,
+      "intermediateHandoffPeriod": "P2147483647D",
+      "logParseExceptions": false,
+      "maxParseExceptions": 2147483647,
+      "maxSavedParseExceptions": 0,
+      "numPersistThreads": 1,
+      "skipSequenceNumberAvailabilityCheck": false
+    },
+    "ioConfig": {
+      "type": "kafka",
+      "taskGroupId": 0,
+      "baseSequenceName": "index_kafka_crop-data-topic_16b5d4207f026ae",
+      "startPartitions": {
+        "type": "end",
+        "stream": "crop-data-topic",
+        "topic": "crop-data-topic",
+        "partitionSequenceNumberMap": {
+          "0": 1647
+        },
+        "partitionOffsetMap": {
+          "0": 1647
+        }
+      },
+      "endPartitions": {
+        "type": "end",
+        "stream": "crop-data-topic",
+        "topic": "crop-data-topic",
+        "partitionSequenceNumberMap": {
+          "0": 9223372036854775807
+        },
+        "partitionOffsetMap": {
+          "0": 9223372036854775807
+        }
+      },
+      "startSequenceNumbers": {
+        "type": "start",
+        "stream": "crop-data-topic",
+        "topic": "crop-data-topic",
+        "partitionSequenceNumberMap": {
+          "0": 1647
+        },
+        "partitionOffsetMap": {
+          "0": 1647
+        },
+        "exclusivePartitions": []
+      },
+      "endSequenceNumbers": {
+        "type": "end",
+        "stream": "crop-data-topic",
+        "topic": "crop-data-topic",
+        "partitionSequenceNumberMap": {
+          "0": 9223372036854775807
+        },
+        "partitionOffsetMap": {
+          "0": 9223372036854775807
+        }
+      },
+      "consumerProperties": {
+        "bootstrap.servers": "kafka:9092"
+      },
+      "pollTimeout": 100,
+      "useTransaction": true,
+      "inputFormat": {
+        "type": "json"
+      },
+      "configOverrides": null,
+      "multiTopic": false
+    },
+    "context": {
+      "checkpoints": "{\"0\":{\"0\":1647}}",
+      "useLineageBasedSegmentAllocation": true,
+      "IS_INCREMENTAL_HANDOFF_SUPPORTED": true,
+      "forceTimeChunkLock": true
+    },
+    "groupId": "index_kafka_crop-data-topic",
+    "dataSource": "crop-data-topic"
   }
-  
